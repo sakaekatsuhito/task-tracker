@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>タスク達成率トラッカー</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+:root{--bg:#0f0f12;--surface:#17171c;--surface2:#1e1e25;--border:#2a2a35;--accent:#7c6af7;--accent2:#c084fc;--green:#4ade80;--yellow:#facc15;--red:#f87171;--text:#e8e8f0;--text2:#8888aa;--text3:#55556a;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;min-height:100vh;padding:20px 14px 80px;}
+h1{font-size:12px;font-weight:400;letter-spacing:.1em;color:var(--text3);text-align:center;margin-bottom:18px;}
+h1 span{display:block;font-size:25px;font-weight:700;color:var(--text);letter-spacing:0;margin-top:3px;}
+
+.topbar{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;position:relative;overflow:hidden;}
+.topbar::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));}
+.topbar-row{display:flex;align-items:center;gap:10px;margin-bottom:11px;}
+.pb-bg{flex:1;height:8px;background:var(--surface2);border-radius:99px;overflow:hidden;}
+.pb-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .5s cubic-bezier(.4,0,.2,1);min-width:2px;}
+.pct{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;color:var(--accent2);min-width:54px;text-align:right;}
+.stats{display:flex;gap:14px;font-size:12px;color:var(--text2);}
+.stats b{color:var(--text);}
+
+.toolbar{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;}
+.btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:8px 11px;font-size:12px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn:hover{border-color:var(--accent);color:var(--text);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn.primary:hover{background:#6254d4;}
+.btn.danger:hover{background:var(--red);color:#000;border-color:var(--red);}
+
+.add-row{display:flex;gap:7px;margin-bottom:14px;}
+.add-row input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 13px;font-size:13px;font-family:'Noto Sans JP',sans-serif;color:var(--text);outline:none;transition:border-color .2s;}
+.add-row input:focus{border-color:var(--accent);}
+.add-row input::placeholder{color:var(--text3);}
+
+.filterbar{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;}
+.ftag{background:var(--surface2);border:1px solid var(--border);color:var(--text3);border-radius:99px;padding:5px 12px;font-size:11px;cursor:pointer;transition:all .2s;user-select:none;}
+.ftag.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+.search-wrap{position:relative;margin-bottom:14px;}
+.search-wrap input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px 10px 35px;font-size:13px;font-family:'Noto Sans JP',sans-serif;color:var(--text);outline:none;transition:border-color .2s;}
+.search-wrap input:focus{border-color:var(--accent);}
+.search-wrap input::placeholder{color:var(--text3);}
+.si{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px;pointer-events:none;}
+
+.date-group{margin-bottom:18px;}
+.dg-label{font-size:11px;letter-spacing:.08em;color:var(--text3);margin-bottom:7px;display:flex;align-items:center;gap:8px;}
+.dg-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.task-list{display:flex;flex-direction:column;gap:5px;}
+.task-item{display:flex;align-items:flex-start;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 12px;cursor:pointer;user-select:none;transition:border-color .15s,opacity .2s;}
+.task-item:hover{border-color:var(--accent);}
+.task-item.done{opacity:.4;}
+.task-item.done .task-text{text-decoration:line-through;color:var(--text2);}
+.cb{width:17px;height:17px;border:2px solid var(--border);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:background .2s,border-color .2s;}
+.task-item.done .cb{background:var(--green);border-color:var(--green);}
+.chk{display:none;}
+.task-item.done .chk{display:block;}
+.task-text{flex:1;font-size:13px;line-height:1.5;color:var(--text);word-break:break-all;}
+.btn-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;padding:0 2px;flex-shrink:0;transition:color .2s;}
+.btn-del:hover{color:var(--red);}
+
+.record-btn{width:100%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:500;font-family:'Noto Sans JP',sans-serif;cursor:pointer;margin-bottom:22px;transition:opacity .2s;letter-spacing:.04em;}
+.record-btn:hover{opacity:.87;}
+
+.section-label{font-size:11px;letter-spacing:.1em;color:var(--text3);margin-bottom:9px;}
+.history-list{display:flex;flex-direction:column;gap:8px;}
+.hi{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px 14px;display:flex;align-items:center;gap:12px;}
+.hi-date{font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);min-width:76px;}
+.hi-bar-wrap{flex:1;display:flex;flex-direction:column;gap:4px;}
+.hi-bg{height:5px;background:var(--surface2);border-radius:99px;overflow:hidden;}
+.hi-fill{height:100%;border-radius:99px;}
+.hi-meta{font-size:10px;color:var(--text3);}
+.hi-pct{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;min-width:42px;text-align:right;}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:18px 18px 0 0;width:100%;max-width:560px;padding:20px;transform:translateY(40px);transition:transform .3s cubic-bezier(.4,0,.2,1);}
+.modal-overlay.open .modal{transform:translateY(0);}
+.modal h2{font-size:15px;font-weight:500;margin-bottom:11px;}
+.modal textarea{width:100%;height:210px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;font-family:'DM Mono',monospace;color:var(--text);outline:none;resize:vertical;line-height:1.6;}
+.modal textarea:focus{border-color:var(--accent);}
+.modal-hint{font-size:11px;color:var(--text3);margin:8px 0 14px;line-height:1.6;}
+.modal-actions{display:flex;gap:8px;}
+.modal-actions .btn{flex:1;text-align:center;padding:11px;}
+
+.empty{text-align:center;color:var(--text3);font-size:13px;padding:28px 0;}
+.divider{height:1px;background:var(--border);margin:20px 0;}
+.flash{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--green);color:#0f0f12;font-size:13px;font-weight:500;padding:9px 20px;border-radius:99px;opacity:0;transition:transform .3s,opacity .3s;pointer-events:none;white-space:nowrap;z-index:200;}
+.flash.show{transform:translateX(-50%) translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+<h1>TASK TRACKER<span>タスク達成率</span></h1>
+
+<div class="topbar">
+  <div class="topbar-row">
+    <div class="pb-bg"><div class="pb-fill" id="pbFill" style="width:0%"></div></div>
+    <div class="pct" id="pctLabel">0%</div>
+  </div>
+  <div class="stats">
+    <span>完了 <b id="doneCount">0</b></span>
+    <span>残り <b id="leftCount">0</b></span>
+    <span>合計 <b id="totalCount">0</b></span>
+  </div>
+</div>
+
+<div class="toolbar">
+  <button class="btn primary" onclick="openImport()">📋 リストをインポート</button>
+  <button class="btn" onclick="exportCSV()">📥 CSV出力</button>
+  <button class="btn danger" onclick="clearAll()">🗑 全消去</button>
+</div>
+
+<div class="add-row">
+  <input type="text" id="addInput" placeholder="タスクを1件追加…" maxlength="100">
+  <button class="btn primary" onclick="addSingle()">追加</button>
+</div>
+
+<div class="filterbar" id="filterbar"></div>
+
+<div class="search-wrap">
+  <span class="si">🔍</span>
+  <input type="text" id="searchInput" placeholder="タスクを検索…" oninput="render()">
+</div>
+
+<div id="taskArea"></div>
+
+<button class="record-btn" onclick="recordToday()">📋 今日の達成率を記録する</button>
+
+<div class="divider"></div>
+<div class="section-label">過去の記録</div>
+<div class="history-list" id="historyList"></div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>タスクリストを貼り付けてインポート</h2>
+    <textarea id="importTA" placeholder="0523&#10;- [ ] タスク名&#10;- [x] 完了済みタスク&#10;0522&#10;- [ ] 別のタスク&#10;&#10;そのまま貼り付けてください。"></textarea>
+    <div class="modal-hint">
+      ・日付行（例: 0523、0523金）を認識してグループ分けします<br>
+      ・「- [ ]」→未完了、「- [x]」→完了でインポート<br>
+      ・同じテキストのタスクは重複スキップされます
+    </div>
+    <div class="modal-actions">
+      <button class="btn danger" onclick="closeImport()">キャンセル</button>
+      <button class="btn primary" onclick="doImport()">インポート実行</button>
+    </div>
+  </div>
+</div>
+
+<div class="flash" id="flash"></div>
+
+<script>
+const TK='ttr_tasks_v4', HK='ttr_hist_v4';
+function loadT(){try{return JSON.parse(localStorage.getItem(TK))||[];}catch{return[];}}
+function saveT(t){localStorage.setItem(TK,JSON.stringify(t));}
+function loadH(){try{return JSON.parse(localStorage.getItem(HK))||[];}catch{return[];}}
+function saveH(h){localStorage.setItem(HK,JSON.stringify(h));}
+
+let tasks=loadT(), history=loadH(), activeFilter='ALL';
+
+function p2(n){return String(n).padStart(2,'0');}
+function todayStr(){const d=new Date();return`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;}
+function fmtDate(iso){const[y,m,d]=iso.split('-');const days=['日','月','火','水','木','金','土'];const dt=new Date(+y,+m-1,+d);return`${+m}/${+d}(${days[dt.getDay()]})`;}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function uid(){return Math.random().toString(36).slice(2,10);}
+function flash(msg,c='var(--green)'){const el=document.getElementById('flash');el.textContent=msg;el.style.background=c;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500);}
+
+// ── parse ──
+function parseList(text){
+  const lines=text.split('\n');
+  const items=[];
+  let curDate='未分類';
+  const dateRe=/^(\d{4})[^\-\[\]]*$/;
+  const taskRe=/^-\s*\[([ xX])\]\s*(.*)/;
+  for(const raw of lines){
+    const line=raw.trim();
+    if(!line) continue;
+    if(taskRe.test(line)){
+      const m=line.match(taskRe);
+      const text=m[2].trim();
+      if(text) items.push({id:uid(),text,done:m[1].trim()!=='',date:curDate});
+    } else if(dateRe.test(line)){
+      const code=line.match(/^\d{4}/)[0];
+      curDate=`${code.slice(0,2)}/${code.slice(2,4)}`;
+    }
+  }
+  return items;
+}
+
+function openImport(){document.getElementById('modalOverlay').classList.add('open');}
+function closeImport(){document.getElementById('modalOverlay').classList.remove('open');}
+function doImport(){
+  const text=document.getElementById('importTA').value;
+  if(!text.trim()){flash('テキストを貼り付けてください','var(--yellow)');return;}
+  const parsed=parseList(text);
+  if(!parsed.length){flash('タスクが見つかりませんでした','var(--red)');return;}
+  const existSet=new Set(tasks.map(t=>t.text));
+  const newOnes=parsed.filter(t=>!existSet.has(t.text));
+  tasks=[...tasks,...newOnes];
+  saveT(tasks);
+  closeImport();
+  document.getElementById('importTA').value='';
+  flash(`${newOnes.length}件インポート（重複${parsed.length-newOnes.length}件スキップ）`);
+  render();
+}
+
+function addSingle(){
+  const inp=document.getElementById('addInput');
+  const text=inp.value.trim();
+  if(!text) return;
+  const today=todayStr().slice(5).replace('-','/');
+  tasks.push({id:uid(),text,done:false,date:today});
+  saveT(tasks); inp.value=''; render();
+}
+
+function toggleTask(id){const t=tasks.find(t=>t.id===id);if(t){t.done=!t.done;saveT(tasks);render();}}
+function deleteTask(id){tasks=tasks.filter(t=>t.id!==id);saveT(tasks);render();}
+
+function recordToday(){
+  const today=todayStr();
+  const total=tasks.length, done=tasks.filter(t=>t.done).length;
+  const pct=total===0?0:Math.round(done/total*100);
+  const idx=history.findIndex(h=>h.date===today);
+  const rec={date:today,done,total,pct,savedAt:new Date().toISOString()};
+  if(idx>=0) history[idx]=rec; else history.push(rec);
+  saveH(history);
+  flash(`✓ ${fmtDate(today)} を記録（${pct}%）`);
+  renderHistory();
+}
+
+function clearAll(){if(!confirm('全タスクを削除しますか？')) return;tasks=[];saveT(tasks);flash('全タスクを消去しました');render();}
+
+function exportCSV(){
+  if(!history.length){flash('記録がありません','var(--yellow)');return;}
+  const sorted=[...history].sort((a,b)=>a.date.localeCompare(b.date));
+  const rows=[['日付','完了数','合計数','達成率(%)','記録時刻']];
+  sorted.forEach(h=>rows.push([h.date,h.done,h.total,h.pct,h.savedAt||'']));
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.join(',')).join('\n')],{type:'text/csv;charset=utf-8;'}));
+  a.download=`task_tracker_${todayStr()}.csv`;
+  a.click();
+  flash('CSVを出力しました');
+}
+
+function render(){
+  const search=document.getElementById('searchInput').value.trim().toLowerCase();
+  const dates=[...new Set(tasks.map(t=>t.date))].sort();
+
+  // filterbar
+  const fb=document.getElementById('filterbar');
+  fb.innerHTML='';
+  [['ALL','すべて'],['UNDONE','未完了のみ'],...dates.map(d=>[d,d])].forEach(([val,label])=>{
+    const el=document.createElement('div');
+    el.className='ftag'+(activeFilter===val?' active':'');
+    el.textContent=label;
+    el.onclick=()=>{activeFilter=val;render();};
+    fb.appendChild(el);
+  });
+
+  // stats
+  const total=tasks.length, done=tasks.filter(t=>t.done).length;
+  const pct=total===0?0:Math.round(done/total*100);
+  document.getElementById('pbFill').style.width=pct+'%';
+  document.getElementById('pctLabel').textContent=pct+'%';
+  document.getElementById('pctLabel').style.color=pct>=80?'var(--green)':pct>=50?'var(--yellow)':'var(--accent2)';
+  document.getElementById('doneCount').textContent=done;
+  document.getElementById('leftCount').textContent=total-done;
+  document.getElementById('totalCount').textContent=total;
+
+  // filtered
+  let visible=tasks;
+  if(activeFilter==='UNDONE') visible=visible.filter(t=>!t.done);
+  else if(activeFilter!=='ALL') visible=visible.filter(t=>t.date===activeFilter);
+  if(search) visible=visible.filter(t=>t.text.toLowerCase().includes(search));
+
+  const area=document.getElementById('taskArea');
+  if(!visible.length){
+    area.innerHTML='<div class="empty">タスクがありません。「リストをインポート」から貼り付けてください。</div>';
+    renderHistory(); return;
+  }
+
+  // group by date
+  const dateOrder=['未分類',...dates.filter(d=>d!=='未分類')];
+  const groups={};
+  visible.forEach(t=>{if(!groups[t.date])groups[t.date]=[];groups[t.date].push(t);});
+
+  area.innerHTML='';
+  Object.keys(groups).sort((a,b)=>{
+    const ia=dateOrder.indexOf(a), ib=dateOrder.indexOf(b);
+    return(ia===-1?999:ia)-(ib===-1?999:ib);
+  }).forEach(date=>{
+    const grp=groups[date];
+    const gdone=grp.filter(t=>t.done).length;
+    const gDiv=document.createElement('div');
+    gDiv.className='date-group';
+    gDiv.innerHTML=`<div class="dg-label">${esc(date)}&nbsp;<span style="color:var(--accent2);font-family:'DM Mono',monospace;font-size:10px;">${gdone}/${grp.length}</span></div><div class="task-list"></div>`;
+    const ul=gDiv.querySelector('.task-list');
+    grp.forEach(t=>{
+      const item=document.createElement('div');
+      item.className='task-item'+(t.done?' done':'');
+      item.innerHTML=`<div class="cb"><svg class="chk" width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 3.5L3.8 6.5L9 1" stroke="#0f0f12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="task-text">${esc(t.text)}</div><button class="btn-del" onclick="event.stopPropagation();deleteTask('${t.id}')">×</button>`;
+      item.addEventListener('click',()=>toggleTask(t.id));
+      ul.appendChild(item);
+    });
+    area.appendChild(gDiv);
+  });
+  renderHistory();
+}
+
+function renderHistory(){
+  const el=document.getElementById('historyList');
+  if(!history.length){el.innerHTML='<div class="empty" style="padding:14px 0">まだ記録がありません</div>';return;}
+  el.innerHTML=[...history].sort((a,b)=>b.date.localeCompare(a.date)).map(h=>{
+    const c=h.pct>=80?'var(--green)':h.pct>=50?'var(--yellow)':'var(--red)';
+    return`<div class="hi"><div class="hi-date">${fmtDate(h.date)}</div><div class="hi-bar-wrap"><div class="hi-bg"><div class="hi-fill" style="width:${h.pct}%;background:${c}"></div></div><div class="hi-meta">${h.done}/${h.total} 完了</div></div><div class="hi-pct" style="color:${c}">${h.pct}%</div></div>`;
+  }).join('');
+}
+
+document.getElementById('addInput').addEventListener('keydown',e=>{if(e.key==='Enter')addSingle();});
+document.getElementById('modalOverlay').addEventListener('click',e=>{if(e.target===e.currentTarget)closeImport();});
+render();
+</script>
+</body>
+</html>
